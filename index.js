@@ -6,13 +6,10 @@ const app = express();
 
 // Rutas
 //ejemplo :const authRoutes = require("./src/routes/authRoutes");
-const authRoutes = require('./src/routes/authRoutes');
+const authRoutes = require("./src/routes/authRoutes");
 
 // Lista de orígenes permitidos
-const allowedOrigins = [
-  "http://localhost:8080",
-  "https://pruebasneoled.netlify.app",
-];
+const allowedOrigins = ["http://localhost:8080", "https://hokkori.netlify.app"];
 
 // Opciones de configuración CORS
 const corsOptions = {
@@ -47,7 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Rutas
 //ejempl: app.use("/api/auth", authRoutes);
-app.use('/api', authRoutes);
+app.use("/api", authRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
