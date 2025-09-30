@@ -112,6 +112,62 @@ const productsController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
+  },
+
+  // Nuevo método para crear órdenes
+createOrder: async (req, res) => {
+  try {
+    const {
+      customerName,
+      phoneNumber,
+      orderType,
+      notes,
+      items,
+      total,
+      status,
+      paymentStatus,
+      couponCode,
+      discountAmount
+    } = req.body;
+
+    // Validaciones básicas
+    if (!customerName || !customerName.trim()) {
+      return res.status(400).json({ error: "El nombre del cliente es requerido" });
+    }
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: "El pedido debe contener al menos un producto" });
+    }
+
+    const newOrder = await productsService.createOrder({
+      customerName: customerName.trim(),
+      phoneNumber: phoneNumber || '',
+      orderType,
+      notes: notes || '',
+      items,
+      total: parseFloat(total),
+      status,
+      paymentStatus,
+      couponCode,
+      discountAmount: discountAmount ? parseFloat(discountAmount) : 0
+    });
+    
+    res.status(201).json(newOrder);
+  } catch (error) {
+    console.error("Error in createOrder controller:", error);
+    res.status(500).json({ error: error.message });
+  }
+},
+
+  // Nuevo método para validar cupones
+  validateCoupon: async (req, res) => {
+    try {
+      const { code } = req.params;
+      const validation = await productsService.validateCoupon(code);
+      res.json(validation);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 

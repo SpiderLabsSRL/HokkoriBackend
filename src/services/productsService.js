@@ -1,5 +1,4 @@
 const { query } = require("../../db");
-const bcrypt = require("bcrypt");
 
 const productsService = {
   // Categorías
@@ -14,7 +13,6 @@ const productsService = {
   },
 
   createCategory: async (nombre) => {
-    // Verificar si ya existe una categoría con el mismo nombre (activa o inactiva)
     const existingCategory = await query(
       `SELECT idcategoria FROM categorias WHERE nombre = $1 AND estado IN (0, 1)`,
       [nombre]
@@ -24,7 +22,6 @@ const productsService = {
       throw new Error("Ya existe una categoría con ese nombre");
     }
 
-    // Si existe una categoría eliminada con el mismo nombre, reactivarla
     const deletedCategory = await query(
       `SELECT idcategoria FROM categorias WHERE nombre = $1 AND estado = 2`,
       [nombre]
@@ -38,7 +35,6 @@ const productsService = {
       return result.rows[0];
     }
 
-    // Crear nueva categoría
     const result = await query(
       `INSERT INTO categorias (nombre, estado) 
        VALUES ($1, 0) 
@@ -49,7 +45,6 @@ const productsService = {
   },
 
   updateCategory: async (id, nombre) => {
-    // Verificar si ya existe otra categoría con el mismo nombre
     const existingCategory = await query(
       `SELECT idcategoria FROM categorias 
        WHERE nombre = $1 AND idcategoria != $2 AND estado IN (0, 1)`,
@@ -99,14 +94,12 @@ const productsService = {
        ORDER BY c.nombre, p.nombre`
     );
     
-    // Convertir imágenes bytea a base64
     const productsWithBase64 = result.rows.map(product => {
       if (product.imagen) {
-        // Convertir Buffer a base64
         const base64Image = product.imagen.toString('base64');
         return {
           ...product,
-          imagen: base64Image // Enviar solo el base64, el frontend construirá la data URL
+          imagen: base64Image
         };
       }
       return product;
@@ -125,10 +118,8 @@ const productsService = {
        ORDER BY c.nombre, p.nombre`
     );
     
-    // Convertir imágenes bytea a base64
     const productsWithBase64 = result.rows.map(product => {
       if (product.imagen) {
-        // Convertir Buffer a base64
         const base64Image = product.imagen.toString('base64');
         return {
           ...product,
@@ -144,7 +135,6 @@ const productsService = {
   createProduct: async (productData) => {
     const { nombre, descripcion, categoria_id, precio, imagen } = productData;
 
-    // Verificar si la categoría existe y está activa
     const category = await query(
       `SELECT idcategoria FROM categorias WHERE idcategoria = $1 AND estado = 0`,
       [categoria_id]
@@ -154,11 +144,9 @@ const productsService = {
       throw new Error("La categoría seleccionada no existe o no está activa");
     }
 
-    // Si la imagen viene como base64, convertirla a Buffer
     let imagenBuffer = null;
     if (imagen) {
       try {
-        // Extraer solo el base64 si viene como data URL
         const base64Data = imagen.startsWith('data:') 
           ? imagen.split(',')[1] 
           : imagen;
@@ -177,7 +165,6 @@ const productsService = {
       [nombre, descripcion, categoria_id, precio, imagenBuffer]
     );
 
-    // Obtener el producto con el nombre de la categoría y convertir imagen
     const productWithCategory = await query(
       `SELECT p.idproducto, p.nombre, p.descripcion, p.categoria_id, 
               p.precio::text, p.imagen, p.estado, c.nombre as categoria_nombre
@@ -187,7 +174,6 @@ const productsService = {
       [result.rows[0].idproducto]
     );
 
-    // Convertir imagen a base64 para la respuesta
     const product = productWithCategory.rows[0];
     if (product.imagen) {
       product.imagen = product.imagen.toString('base64');
@@ -199,7 +185,6 @@ const productsService = {
   updateProduct: async (id, productData) => {
     const { nombre, descripcion, categoria_id, precio, imagen } = productData;
 
-    // Verificar si la categoría existe y está activa
     const category = await query(
       `SELECT idcategoria FROM categorias WHERE idcategoria = $1 AND estado = 0`,
       [categoria_id]
@@ -209,11 +194,9 @@ const productsService = {
       throw new Error("La categoría seleccionada no existe o no está activa");
     }
 
-    // Si la imagen viene como base64, convertirla a Buffer
     let imagenBuffer = null;
     if (imagen) {
       try {
-        // Extraer solo el base64 si viene como data URL
         const base64Data = imagen.startsWith('data:') 
           ? imagen.split(',')[1] 
           : imagen;
@@ -237,7 +220,6 @@ const productsService = {
       throw new Error("Producto no encontrado");
     }
 
-    // Obtener el producto con el nombre de la categoría y convertir imagen
     const productWithCategory = await query(
       `SELECT p.idproducto, p.nombre, p.descripcion, p.categoria_id, 
               p.precio::text, p.imagen, p.estado, c.nombre as categoria_nombre
@@ -247,7 +229,6 @@ const productsService = {
       [id]
     );
 
-    // Convertir imagen a base64 para la respuesta
     const product = productWithCategory.rows[0];
     if (product.imagen) {
       product.imagen = product.imagen.toString('base64');
@@ -269,7 +250,6 @@ const productsService = {
       throw new Error("Producto no encontrado");
     }
 
-    // Obtener el producto con el nombre de la categoría y convertir imagen
     const productWithCategory = await query(
       `SELECT p.idproducto, p.nombre, p.descripcion, p.categoria_id, 
               p.precio::text, p.imagen, p.estado, c.nombre as categoria_nombre
@@ -279,7 +259,6 @@ const productsService = {
       [id]
     );
 
-    // Convertir imagen a base64 para la respuesta
     const product = productWithCategory.rows[0];
     if (product.imagen) {
       product.imagen = product.imagen.toString('base64');
@@ -299,7 +278,127 @@ const productsService = {
     }
 
     return result.rows[0];
-  }
+  },
+
+  // Nuevo método para crear órdenes
+  createOrder: async (orderData) => {
+    const {
+      customerName,
+      phoneNumber,
+      orderType,
+      notes,
+      items,
+      total,
+      status,
+      paymentStatus,
+      couponCode,
+      discountAmount
+    } = orderData;
+
+    try {
+      // Buscar el cupón si existe
+      let cuponId = null;
+      if (couponCode) {
+        const couponResult = await query(
+          'SELECT idcupon FROM cupones WHERE nombre = $1 AND estado = 0',
+          [couponCode]
+        );
+        if (couponResult.rows.length > 0) {
+          cuponId = couponResult.rows[0].idcupon;
+        }
+      }
+
+      // Calcular subtotal (total + descuento)
+      const subtotal = total + (discountAmount || 0);
+
+      // Insertar la orden principal
+      const orderResult = await query(
+        `INSERT INTO pedidos (nombre_cliente, tipo, notas, subtotal, descuento, total, cupon_id, estado) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 0) 
+         RETURNING idpedido`,
+        [
+          customerName,
+          orderType,
+          notes || '',
+          subtotal,
+          discountAmount || 0,
+          total,
+          cuponId
+        ]
+      );
+
+      const orderId = orderResult.rows[0].idpedido;
+
+      // Insertar los items del pedido
+      for (const item of items) {
+        await query(
+          `INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario, subtotal_linea) 
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            orderId,
+            item.productId,
+            item.quantity,
+            item.price,
+            item.price * item.quantity
+          ]
+        );
+      }
+
+      return {
+        idOrden: orderId,
+        cliente: customerName,
+        telefono: phoneNumber || '',
+        tipo: orderType,
+        notas: notes || '',
+        total: total,
+        estado: 'pendiente',
+        estado_pago: 'pendiente',
+        fecha_creacion: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('Error creating order:', error);
+      throw new Error(`Error al crear el pedido: ${error.message}`);
+    }
+  },
+
+  // Nuevo método para validar cupones
+  validateCoupon: async (couponCode) => {
+    try {
+      const result = await query(
+        `SELECT idcupon, nombre, monto, tipo, estado, veces_usado 
+         FROM cupones 
+         WHERE nombre = $1 AND estado = 0`,
+        [couponCode]
+      );
+
+      if (result.rows.length === 0) {
+        return {
+          isValid: false,
+          discount: 0,
+          message: "Cupón no válido o no encontrado",
+          couponCode: couponCode
+        };
+      }
+
+      const coupon = result.rows[0];
+      
+      return {
+        isValid: true,
+        discount: coupon.monto,
+        message: `¡Cupón aplicado! ${coupon.monto}% de descuento`,
+        couponCode: coupon.nombre
+      };
+    } catch (error) {
+      console.error("Error validating coupon:", error);
+      return {
+        isValid: false,
+        discount: 0,
+        message: "Error validando cupón",
+        couponCode: couponCode
+      };
+    }
+  },
 };
 
 module.exports = productsService;

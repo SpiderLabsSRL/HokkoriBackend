@@ -16,4 +16,8 @@ router.put("/products/products/:id", productsController.updateProduct);
 router.patch("/products/products/:id/toggle-status", productsController.toggleProductStatus);
 router.delete("/products/products/:id", productsController.deleteProduct);
 
+// Nuevas rutas para órdenes y cupones
+router.post("/orders", productsController.createOrder);
+router.get("/coupons/validate/:code", productsController.validateCoupon);
+
 module.exports = router;
