@@ -92,6 +92,17 @@ const salesService = {
     return result.rows.length > 0 ? parseFloat(result.rows[0].monto_cierre) : 0;
   },
 
+  // Obtener el último registro de caja (abierta o cerrada)
+  async getLastCashRegisterAny() {
+    const result = await query(
+      `SELECT idcaja, estado, monto_apertura, monto_cierre, empleado_id
+       FROM caja 
+       ORDER BY idcaja DESC 
+       LIMIT 1`
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
+  },
+
   // Obtener información del cupón
   async getCouponInfo(couponCode) {
     const result = await query(
@@ -109,24 +120,15 @@ const salesService = {
     );
   },
 
-  // Abrir nueva caja (usando consulta independiente para último monto de cierre)
+  // Abrir nueva caja (sin movimiento de apertura)
   async openCashRegister(employeeId, lastCloseAmount, transaction) {
     const cashRegisterInsert = await transaction.query(
       `INSERT INTO caja (estado, monto_apertura, monto_cierre, empleado_id) 
-       VALUES ('Abierto', $1, $2, $3) RETURNING idcaja`,
-      [lastCloseAmount, lastCloseAmount, employeeId]
+       VALUES ('Abierto', $1, $1, $2) RETURNING idcaja`,
+      [lastCloseAmount, employeeId]
     );
     
-    const cashRegisterId = cashRegisterInsert.rows[0].idcaja;
-
-    // Registrar movimiento de apertura
-    await transaction.query(
-      `INSERT INTO movimiento_caja (caja_id, tipo, descripcion, monto, empleado_id)
-       VALUES ($1, 'Apertura', 'Apertura de caja', $2, $3)`,
-      [cashRegisterId, lastCloseAmount, employeeId]
-    );
-
-    return cashRegisterId;
+    return cashRegisterInsert.rows[0].idcaja;
   },
 
   // Procesar venta completa
@@ -241,17 +243,23 @@ const salesService = {
 
       // 5.3. Para pagos en efectivo: procesar caja
       if (paymentMethod === "efectivo") {
-        // Obtener último monto de cierre (consulta independiente)
-        const lastCloseAmount = await this.getLastCloseAmount();
+        // Obtener el último registro de caja (cualquier estado)
+        const lastCashRegister = await this.getLastCashRegisterAny();
+        let openingAmount = 0;
         
-        // Abrir nueva caja con el último monto de cierre como monto de apertura
-        const cashRegisterId = await this.openCashRegister(employeeId, lastCloseAmount, transaction);
+        if (lastCashRegister) {
+          // Usar el monto_cierre del último registro como monto_apertura del nuevo
+          openingAmount = parseFloat(lastCashRegister.monto_cierre);
+        }
+        
+        // Abrir nueva caja con el monto_cierre anterior como monto_apertura
+        const cashRegisterId = await this.openCashRegister(employeeId, openingAmount, transaction);
 
-        // Registrar movimiento de ingreso por venta
+        // Registrar movimiento de ingreso por venta (solo este movimiento)
         await transaction.query(
           `INSERT INTO movimiento_caja (caja_id, tipo, descripcion, monto, empleado_id)
-           VALUES ($1, 'Ingreso', 'Venta en efectivo - Pedido #' || $2, $3, $4)`,
-          [cashRegisterId, orderId, total, employeeId]
+           VALUES ($1, 'Ingreso', 'Venta en efectivo', $2, $3)`,
+          [cashRegisterId, total, employeeId]
         );
 
         // Actualizar monto de cierre de la caja (monto apertura + total de venta)
