@@ -10,6 +10,7 @@ const authRoutes = require("./src/routes/authRoutes");
 const couponsRoutes = require("./src/routes/couponsRoutes");
 const cajaRoutes = require("./src/routes/cajaRoutes");
 const productsRoutes = require('./src/routes/productsRoutes');
+const salesRoutes = require("./src/routes/salesRoutes");
 // Lista de orígenes permitidos
 const allowedOrigins = ["http://localhost:8080", "https://hokkori.netlify.app"];
 
@@ -50,6 +51,7 @@ app.use("/api", authRoutes);
 app.use("/api/coupons", couponsRoutes);
 app.use("/api", cajaRoutes);
 app.use('/api', productsRoutes);
+app.use('/api',salesRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
