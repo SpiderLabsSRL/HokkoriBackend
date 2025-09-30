@@ -80,19 +80,7 @@ const salesService = {
     return result.rows.length > 0 ? result.rows[0] : null;
   },
 
-  // Obtener el último monto de cierre registrado (consulta independiente)
-  async getLastCloseAmount() {
-    const result = await query(
-      `SELECT monto_cierre 
-       FROM caja 
-       WHERE estado = 'Cerrado' 
-       ORDER BY idcaja DESC 
-       LIMIT 1`
-    );
-    return result.rows.length > 0 ? parseFloat(result.rows[0].monto_cierre) : 0;
-  },
-
-  // Obtener el último registro de caja (abierta o cerrada)
+  // Obtener el último registro de caja de CUALQUIER empleado
   async getLastCashRegisterAny() {
     const result = await query(
       `SELECT idcaja, estado, monto_apertura, monto_cierre, empleado_id
@@ -243,7 +231,7 @@ const salesService = {
 
       // 5.3. Para pagos en efectivo: procesar caja
       if (paymentMethod === "efectivo") {
-        // Obtener el último registro de caja (cualquier estado)
+        // Obtener el último registro de caja de CUALQUIER empleado
         const lastCashRegister = await this.getLastCashRegisterAny();
         let openingAmount = 0;
         
