@@ -18,8 +18,11 @@ router.put("/pedidos/:id/items", pedidosController.updatePedidoItems);
 router.post("/pedidos/:id/pay", pedidosController.processPayment);
 router.patch("/pedidos/:id/deliver", pedidosController.markAsDelivered);
 
-// Rutas para cupones (añadidas aquí)
+// Rutas para cupones
 router.get("/cupones", pedidosController.getCupones);
 router.get("/cupones/:id", pedidosController.getCuponById);
+
+// Nueva ruta para estado de caja
+router.get("/caja/estado", pedidosController.getCajaEstado);
 
 module.exports = router;

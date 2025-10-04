@@ -262,6 +262,7 @@ const processPayment = async (pedidoId, forma_pago, empleado_id) => {
     }
   }
 };
+
 const markAsDelivered = async (pedidoId, empleado_id) => {
   await query(
     "UPDATE pedidos SET estado = 2 WHERE idpedido = $1",
@@ -269,7 +270,7 @@ const markAsDelivered = async (pedidoId, empleado_id) => {
   );
 };
 
-// Funciones para cupones (añadidas aquí)
+// Funciones para cupones
 const getCupones = async () => {
   const result = await query(
     `SELECT * FROM cupones WHERE estado != 2 ORDER BY nombre`
@@ -285,6 +286,28 @@ const getCuponById = async (id) => {
   return result.rows[0];
 };
 
+// Nueva función para obtener estado de caja
+const getCajaEstado = async () => {
+  const result = await query(
+    `SELECT estado, monto_apertura, monto_cierre, empleado_id 
+     FROM caja 
+     ORDER BY idcaja DESC 
+     LIMIT 1`
+  );
+  
+  if (result.rows.length === 0) {
+    // Si no hay registros de caja, devolver estado por defecto como "Cerrado"
+    return {
+      estado: 'Cerrado',
+      monto_apertura: 0,
+      monto_cierre: 0,
+      empleado_id: null
+    };
+  }
+  
+  return result.rows[0];
+};
+
 module.exports = {
   getPedidos,
   getPedidoById,
@@ -297,5 +320,6 @@ module.exports = {
   processPayment,
   markAsDelivered,
   getCupones,
-  getCuponById
+  getCuponById,
+  getCajaEstado
 };

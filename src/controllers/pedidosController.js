@@ -186,6 +186,17 @@ const getCuponById = async (req, res) => {
   }
 };
 
+// Nueva función para obtener estado de caja
+const getCajaEstado = async (req, res) => {
+  try {
+    const estadoCaja = await pedidosService.getCajaEstado();
+    res.json(estadoCaja);
+  } catch (error) {
+    console.error("Error en getCajaEstado:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getPedidos,
   getPedidoById,
@@ -198,5 +209,6 @@ module.exports = {
   processPayment,
   markAsDelivered,
   getCupones,
-  getCuponById
+  getCuponById,
+  getCajaEstado
 };
