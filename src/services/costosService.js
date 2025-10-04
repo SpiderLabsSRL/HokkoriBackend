@@ -9,16 +9,30 @@ const getActiveProducts = async () => {
         p.nombre,
         p.precio,
         p.categoria_id,
+        p.imagen,
         c.nombre as nombre_categoria,
         p.estado
       FROM productos p
       INNER JOIN categorias c ON p.categoria_id = c.idcategoria
-      WHERE p.estado IN (0, 1)  -- Activos e inactivos (no eliminados)
+      WHERE p.estado IN (0, 1)
       ORDER BY c.nombre, p.nombre
     `;
     
     const result = await query(sql);
-    return result.rows;
+    
+    // Convertir imágenes a base64 como en el ejemplo que funciona
+    const productsWithBase64 = result.rows.map(product => {
+      if (product.imagen) {
+        const base64Image = product.imagen.toString('base64');
+        return {
+          ...product,
+          imagen: base64Image
+        };
+      }
+      return product;
+    });
+
+    return productsWithBase64;
   } catch (error) {
     console.error("Error en getActiveProducts:", error);
     throw error;
@@ -45,14 +59,8 @@ const getProductCategories = async () => {
 
 const getSalesAnalysis = async (productIds, dateFrom, dateTo) => {
   try {
-    // Convertir las fechas al formato correcto para PostgreSQL
-    const startDate = new Date(dateFrom).toISOString();
-    const endDate = new Date(dateTo);
-    endDate.setHours(23, 59, 59, 999); // Hasta el final del día
-    const endDateISO = endDate.toISOString();
-    
     const placeholders = productIds.map((_, index) => `$${index + 1}`).join(',');
-    const params = [...productIds, startDate, endDateISO];
+    const params = [...productIds, dateFrom, dateTo];
     
     const sql = `
       SELECT 
@@ -68,24 +76,47 @@ const getSalesAnalysis = async (productIds, dateFrom, dateTo) => {
       LEFT JOIN pedidos ped ON dp.pedido_id = ped.idpedido
       LEFT JOIN ventas v ON ped.idpedido = v.pedido_id
       WHERE p.idproducto IN (${placeholders})
-        AND ped.fecha_hora >= $${productIds.length + 1}
-        AND ped.fecha_hora <= $${productIds.length + 2}
-        AND ped.estado IN (1, 2)  -- Pagados y entregados
-        AND v.idventa IS NOT NULL  -- Solo ventas confirmadas
+        AND DATE(ped.fecha_hora) >= $${productIds.length + 1}::DATE
+        AND DATE(ped.fecha_hora) <= $${productIds.length + 2}::DATE
+        AND ped.estado IN (1, 2)
+        AND v.idventa IS NOT NULL
       GROUP BY p.idproducto, p.nombre, p.precio, c.nombre
       ORDER BY c.nombre, p.nombre
     `;
     
-    console.log("SQL Query:", sql);
-    console.log("Params:", params);
+    console.log("SQL Query para análisis de ventas:", sql);
+    console.log("Parámetros:", params);
     
     const result = await query(sql, params);
-    console.log("Query result:", result.rows);
+    console.log("Resultado del análisis:", result.rows);
     
     return result.rows;
   } catch (error) {
     console.error("Error en getSalesAnalysis:", error);
-    console.error("Error details:", error.message);
+    console.error("Detalles del error:", error.message);
+    throw error;
+  }
+};
+
+const getProductImage = async (productId) => {
+  try {
+    const sql = `
+      SELECT imagen 
+      FROM productos 
+      WHERE idproducto = $1 AND estado IN (0, 1)
+    `;
+    
+    const result = await query(sql, [productId]);
+    
+    if (result.rows.length === 0 || !result.rows[0].imagen) {
+      return null;
+    }
+    
+    // Convertir a base64 para consistencia
+    const base64Image = result.rows[0].imagen.toString('base64');
+    return base64Image;
+  } catch (error) {
+    console.error("Error en getProductImage:", error);
     throw error;
   }
 };
@@ -93,5 +124,6 @@ const getSalesAnalysis = async (productIds, dateFrom, dateTo) => {
 module.exports = {
   getActiveProducts,
   getProductCategories,
-  getSalesAnalysis
+  getSalesAnalysis,
+  getProductImage
 };
