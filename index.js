@@ -61,7 +61,7 @@ app.use('/api',salesRoutes);
 app.use('/api', ventasRoutes);
 app.use('/api/users', usersRoutes);
 app.use("/api", movimientosRoutes);
-app.use("/api/pedidos", pedidosRoutes);
+app.use("/api", pedidosRoutes);
 app.use('/api', costosRoutes);
 
 // Manejador de errores global

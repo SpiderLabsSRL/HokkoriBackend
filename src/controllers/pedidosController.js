@@ -161,6 +161,31 @@ const markAsDelivered = async (req, res) => {
   }
 };
 
+// Funciones para cupones (añadidas aquí)
+const getCupones = async (req, res) => {
+  try {
+    const cupones = await pedidosService.getCupones();
+    res.json(cupones);
+  } catch (error) {
+    console.error("Error en getCupones:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getCuponById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cupon = await pedidosService.getCuponById(parseInt(id));
+    if (!cupon) {
+      return res.status(404).json({ error: "Cupón no encontrado" });
+    }
+    res.json(cupon);
+  } catch (error) {
+    console.error("Error en getCuponById:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getPedidos,
   getPedidoById,
@@ -171,5 +196,7 @@ module.exports = {
   createPedidoItems,
   updatePedidoItems,
   processPayment,
-  markAsDelivered
+  markAsDelivered,
+  getCupones,
+  getCuponById
 };

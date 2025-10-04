@@ -18,4 +18,8 @@ router.put("/pedidos/:id/items", pedidosController.updatePedidoItems);
 router.post("/pedidos/:id/pay", pedidosController.processPayment);
 router.patch("/pedidos/:id/deliver", pedidosController.markAsDelivered);
 
+// Rutas para cupones (añadidas aquí)
+router.get("/cupones", pedidosController.getCupones);
+router.get("/cupones/:id", pedidosController.getCuponById);
+
 module.exports = router;
