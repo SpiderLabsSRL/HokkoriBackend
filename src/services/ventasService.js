@@ -273,7 +273,7 @@ const getTotalesPorRango = async (fechaInicio, fechaFin) => {
   return result.rows[0];
 };
 
-// NUEVA FUNCIÓN: Obtener totales del día actual específicamente
+// Obtener totales del día actual específicamente
 const getTotalesHoy = async () => {
   const sql = `
     SELECT 

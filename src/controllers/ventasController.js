@@ -29,20 +29,33 @@ const getVentas = async (req, res) => {
 
 const getVentasHoy = async (req, res) => {
   try {
-    const { empleadoId } = req.query;
-    
-    let ventas;
-    if (empleadoId) {
-      ventas = await ventasService.getVentasHoyPorEmpleado(parseInt(empleadoId));
-    } else {
-      ventas = await ventasService.getVentasHoy();
-    }
-    
+    const ventas = await ventasService.getVentasHoy();
     res.json(ventas);
   } catch (error) {
     console.error("Error en getVentasHoy:", error);
     res.status(500).json({ 
       error: "Error al obtener las ventas del día",
+      detalles: error.message 
+    });
+  }
+};
+
+const getVentasHoyEmpleado = async (req, res) => {
+  try {
+    const { empleadoId } = req.query;
+    
+    if (!empleadoId) {
+      return res.status(400).json({ 
+        error: "Se requiere el ID del empleado" 
+      });
+    }
+    
+    const ventas = await ventasService.getVentasHoyPorEmpleado(parseInt(empleadoId));
+    res.json(ventas);
+  } catch (error) {
+    console.error("Error en getVentasHoyEmpleado:", error);
+    res.status(500).json({ 
+      error: "Error al obtener las ventas del día del empleado",
       detalles: error.message 
     });
   }
@@ -88,5 +101,6 @@ const getTotalesVentas = async (req, res) => {
 module.exports = {
   getVentas,
   getVentasHoy,
+  getVentasHoyEmpleado,
   getTotalesVentas
 };
