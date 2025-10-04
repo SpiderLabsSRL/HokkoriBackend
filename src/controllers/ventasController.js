@@ -53,7 +53,9 @@ const getTotalesVentas = async (req, res) => {
     const { fecha, fechaInicio, fechaFin } = req.query;
     
     let totales;
+    let totalesHoy;
     
+    // Obtener totales según filtro
     if (fecha) {
       totales = await ventasService.getTotalesPorFecha(fecha);
     } else if (fechaInicio && fechaFin) {
@@ -62,7 +64,18 @@ const getTotalesVentas = async (req, res) => {
       totales = await ventasService.getTotalesGenerales();
     }
     
-    res.json(totales);
+    // Siempre obtener los totales del día actual
+    totalesHoy = await ventasService.getTotalesHoy();
+    
+    // Combinar los resultados
+    const resultado = {
+      totalGeneral: parseFloat(totales.total_general) || 0,
+      totalEfectivo: parseFloat(totales.total_efectivo) || 0,
+      totalQR: parseFloat(totales.total_qr) || 0,
+      totalGeneralHoy: parseFloat(totalesHoy.total_general_hoy) || 0
+    };
+    
+    res.json(resultado);
   } catch (error) {
     console.error("Error en getTotalesVentas:", error);
     res.status(500).json({ 
