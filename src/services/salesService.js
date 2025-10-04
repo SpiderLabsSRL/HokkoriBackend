@@ -63,18 +63,14 @@ const salesService = {
   },
 
   // Obtener el último registro de caja del empleado
-  async getLastCashRegister(employeeId) {
-    if (!employeeId) {
-      throw new Error("Employee ID is required");
-    }
+  async getLastCashRegister (){
+    
 
     const result = await query(
       `SELECT idcaja, estado, monto_apertura, monto_cierre, empleado_id
        FROM caja 
-       WHERE empleado_id = $1 
        ORDER BY idcaja DESC 
-       LIMIT 1`,
-      [employeeId]
+       LIMIT 1`
     );
     
     return result.rows.length > 0 ? result.rows[0] : null;
