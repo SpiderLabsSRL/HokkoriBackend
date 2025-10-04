@@ -140,13 +140,13 @@ const salesService = {
       throw new Error("ID de empleado no válido");
     }
 
-    // 1. Manejar cupón
+    // 1. Manejar cupón - SOLO OBTENER INFO POR AHORA
     let couponId = null;
     if (couponCode && couponCode !== "none") {
       const coupon = await this.getCouponInfo(couponCode);
       if (coupon) {
         couponId = coupon.idcupon;
-        await this.updateCouponUsage(couponId, transaction);
+        // NO ACTUALIZAR USO AQUÍ - SE ACTUALIZARÁ SOLO SI ES EFECTIVO O QR
       }
     }
 
@@ -196,6 +196,11 @@ const salesService = {
 
     // 5. Si no es "cobrar al finalizar", procesar venta y caja
     if (paymentMethod !== "pagar-entregar") {
+      // 5.0. ACTUALIZAR USO DEL CUPÓN SOLO PARA EFECTIVO O QR
+      if (couponId) {
+        await this.updateCouponUsage(couponId, transaction);
+      }
+
       // 5.1. Insertar venta
       const saleResult = await transaction.query(
         `INSERT INTO ventas (
