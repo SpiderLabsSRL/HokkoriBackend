@@ -7,5 +7,7 @@ router.get("/movimientos/caja/estado", movimientosController.getEstadoCaja);
 router.get("/movimientos/caja/saldo", movimientosController.getSaldoCaja);
 router.get("/movimientos/historial/dia", movimientosController.getHistorialDelDia);
 router.post("/movimientos/registrar", movimientosController.registrarMovimiento);
+router.post("/movimientos/apertura", movimientosController.aperturaCaja);
+router.post("/movimientos/cierre", movimientosController.cierreCaja);
 
 module.exports = router;

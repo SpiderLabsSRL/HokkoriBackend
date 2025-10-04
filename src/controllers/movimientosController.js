@@ -42,7 +42,6 @@ const registrarMovimiento = async (req, res) => {
       return res.status(400).json({ error: "Todos los campos son requeridos" });
     }
 
-    // Validar que el monto sea positivo
     if (parseFloat(monto) <= 0) {
       return res.status(400).json({ error: "El monto debe ser mayor a 0" });
     }
@@ -61,9 +60,63 @@ const registrarMovimiento = async (req, res) => {
   }
 };
 
+const aperturaCaja = async (req, res) => {
+  try {
+    const { monto, descripcion } = req.body;
+    const empleadoId = 1; // Cambiar esto según tu lógica de sesión
+
+    if (!monto || !descripcion) {
+      return res.status(400).json({ error: "Todos los campos son requeridos" });
+    }
+
+    if (parseFloat(monto) <= 0) {
+      return res.status(400).json({ error: "El monto debe ser mayor a 0" });
+    }
+
+    const movimiento = await movimientosService.abrirCaja(
+      parseFloat(monto),
+      descripcion,
+      empleadoId
+    );
+
+    res.status(201).json(movimiento);
+  } catch (error) {
+    console.error("Error en aperturaCaja:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const cierreCaja = async (req, res) => {
+  try {
+    const { monto, descripcion } = req.body;
+    const empleadoId = 1; // Cambiar esto según tu lógica de sesión
+
+    if (!monto || !descripcion) {
+      return res.status(400).json({ error: "Todos los campos son requeridos" });
+    }
+
+    if (parseFloat(monto) <= 0) {
+      return res.status(400).json({ error: "El monto debe ser mayor a 0" });
+    }
+
+    const movimiento = await movimientosService.cerrarCaja(
+      parseFloat(monto),
+      descripcion,
+      empleadoId
+    );
+
+    res.status(201).json(movimiento);
+  } catch (error) {
+    console.error("Error en cierreCaja:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getEstadoCaja,
   getSaldoCaja,
   getHistorialDelDia,
   registrarMovimiento,
+  aperturaCaja,
+  cierreCaja,
 };
