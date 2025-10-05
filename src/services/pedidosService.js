@@ -308,6 +308,51 @@ const getCajaEstado = async () => {
   return result.rows[0];
 };
 
+// Funciones para productos
+const searchProductos = async (searchTerm) => {
+  if (!searchTerm || searchTerm.trim() === '') {
+    return [];
+  }
+
+  const result = await query(
+    `SELECT p.idproducto, p.nombre, p.descripcion, p.precio, p.estado, 
+            c.nombre as categoria_nombre
+     FROM productos p
+     LEFT JOIN categorias c ON p.categoria_id = c.idcategoria
+     WHERE p.estado = 0 
+     AND (p.nombre ILIKE $1 OR p.descripcion ILIKE $1)
+     ORDER BY p.nombre
+     LIMIT 20`,
+    [`%${searchTerm}%`]
+  );
+  
+  return result.rows;
+};
+
+const getProductos = async () => {
+  const result = await query(
+    `SELECT p.idproducto, p.nombre, p.descripcion, p.precio, p.estado, 
+            c.nombre as categoria_nombre
+     FROM productos p
+     LEFT JOIN categorias c ON p.categoria_id = c.idcategoria
+     WHERE p.estado = 0
+     ORDER BY p.nombre`
+  );
+  return result.rows;
+};
+
+const getProductoById = async (id) => {
+  const result = await query(
+    `SELECT p.idproducto, p.nombre, p.descripcion, p.precio, p.estado, 
+            c.nombre as categoria_nombre
+     FROM productos p
+     LEFT JOIN categorias c ON p.categoria_id = c.idcategoria
+     WHERE p.idproducto = $1 AND p.estado = 0`,
+    [id]
+  );
+  return result.rows[0];
+};
+
 module.exports = {
   getPedidos,
   getPedidoById,
@@ -321,5 +366,8 @@ module.exports = {
   markAsDelivered,
   getCupones,
   getCuponById,
-  getCajaEstado
+  getCajaEstado,
+  searchProductos,
+  getProductos,
+  getProductoById
 };

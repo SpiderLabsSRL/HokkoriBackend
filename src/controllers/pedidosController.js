@@ -197,6 +197,47 @@ const getCajaEstado = async (req, res) => {
   }
 };
 
+// Funciones para productos
+const searchProductos = async (req, res) => {
+  try {
+    const { search } = req.query;
+    
+    if (!search || search.trim() === '') {
+      return res.json([]);
+    }
+
+    const productos = await pedidosService.searchProductos(search);
+    res.json(productos);
+  } catch (error) {
+    console.error("Error en searchProductos:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getProductos = async (req, res) => {
+  try {
+    const productos = await pedidosService.getProductos();
+    res.json(productos);
+  } catch (error) {
+    console.error("Error en getProductos:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getProductoById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const producto = await pedidosService.getProductoById(parseInt(id));
+    if (!producto) {
+      return res.status(404).json({ error: "Producto no encontrado" });
+    }
+    res.json(producto);
+  } catch (error) {
+    console.error("Error en getProductoById:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getPedidos,
   getPedidoById,
@@ -210,5 +251,8 @@ module.exports = {
   markAsDelivered,
   getCupones,
   getCuponById,
-  getCajaEstado
+  getCajaEstado,
+  searchProductos,
+  getProductos,
+  getProductoById
 };
