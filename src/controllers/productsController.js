@@ -1,7 +1,7 @@
 const productsService = require("../services/productsService");
 
 // Constantes para validación
-const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 2MB
 
 const productsController = {
   // Categorías
