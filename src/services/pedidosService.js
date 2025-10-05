@@ -309,6 +309,7 @@ const getCajaEstado = async () => {
 };
 
 // Funciones para productos
+// Funciones para productos
 const searchProductos = async (searchTerm) => {
   if (!searchTerm || searchTerm.trim() === '') {
     return [];
@@ -316,7 +317,7 @@ const searchProductos = async (searchTerm) => {
 
   const result = await query(
     `SELECT p.idproducto, p.nombre, p.descripcion, p.precio, p.estado, 
-            c.nombre as categoria_nombre
+            c.nombre as categoria_nombre, p.imagen
      FROM productos p
      LEFT JOIN categorias c ON p.categoria_id = c.idcategoria
      WHERE p.estado = 0 
@@ -326,31 +327,51 @@ const searchProductos = async (searchTerm) => {
     [`%${searchTerm}%`]
   );
   
-  return result.rows;
+  // Convertir imagen bytea a base64
+  return result.rows.map(producto => ({
+    ...producto,
+    imagen: producto.imagen ? `data:image/jpeg;base64,${producto.imagen.toString('base64')}` : null
+  }));
 };
 
 const getProductos = async () => {
   const result = await query(
     `SELECT p.idproducto, p.nombre, p.descripcion, p.precio, p.estado, 
-            c.nombre as categoria_nombre
+            c.nombre as categoria_nombre, p.imagen
      FROM productos p
      LEFT JOIN categorias c ON p.categoria_id = c.idcategoria
      WHERE p.estado = 0
      ORDER BY p.nombre`
   );
-  return result.rows;
+  
+  // Convertir imagen bytea a base64
+  return result.rows.map(producto => ({
+    ...producto,
+    imagen: producto.imagen ? `data:image/jpeg;base64,${producto.imagen.toString('base64')}` : null
+  }));
 };
 
 const getProductoById = async (id) => {
   const result = await query(
     `SELECT p.idproducto, p.nombre, p.descripcion, p.precio, p.estado, 
-            c.nombre as categoria_nombre
+            c.nombre as categoria_nombre, p.imagen
      FROM productos p
      LEFT JOIN categorias c ON p.categoria_id = c.idcategoria
      WHERE p.idproducto = $1 AND p.estado = 0`,
     [id]
   );
-  return result.rows[0];
+  
+  if (result.rows.length === 0) {
+    return null;
+  }
+  
+  const producto = result.rows[0];
+  
+  // Convertir imagen bytea a base64
+  return {
+    ...producto,
+    imagen: producto.imagen ? `data:image/jpeg;base64,${producto.imagen.toString('base64')}` : null
+  };
 };
 
 module.exports = {
