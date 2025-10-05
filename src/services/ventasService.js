@@ -290,6 +290,76 @@ const getTotalesHoy = async () => {
   return result.rows[0];
 };
 
+// Obtener totales del día actual por empleado
+const getTotalesHoyPorEmpleado = async (empleadoId) => {
+  const sql = `
+    SELECT 
+      COALESCE(SUM(total), 0) as total_general_hoy,
+      COALESCE(SUM(CASE WHEN forma_pago = 'Efectivo' THEN total ELSE 0 END), 0) as total_efectivo_hoy,
+      COALESCE(SUM(CASE WHEN forma_pago = 'Qr' THEN total ELSE 0 END), 0) as total_qr_hoy
+    FROM ventas v
+    INNER JOIN empleados e ON v.empleado_id = e.idempleado
+    WHERE DATE(v.fecha_hora) = CURRENT_DATE
+      AND v.empleado_id = $1
+      AND e.estado = 0
+  `;
+  
+  const result = await query(sql, [empleadoId]);
+  return result.rows[0];
+};
+
+// Obtener totales por fecha y empleado
+const getTotalesPorFechaYEmpleado = async (fecha, empleadoId) => {
+  const sql = `
+    SELECT 
+      COALESCE(SUM(total), 0) as total_general,
+      COALESCE(SUM(CASE WHEN forma_pago = 'Efectivo' THEN total ELSE 0 END), 0) as total_efectivo,
+      COALESCE(SUM(CASE WHEN forma_pago = 'Qr' THEN total ELSE 0 END), 0) as total_qr,
+      (
+        SELECT COALESCE(SUM(total), 0) 
+        FROM ventas v2 
+        INNER JOIN empleados e2 ON v2.empleado_id = e2.idempleado
+        WHERE DATE(v2.fecha_hora) = CURRENT_DATE 
+          AND v2.empleado_id = $2
+          AND e2.estado = 0
+      ) as total_general_hoy
+    FROM ventas v
+    INNER JOIN empleados e ON v.empleado_id = e.idempleado
+    WHERE DATE(v.fecha_hora) = $1
+      AND v.empleado_id = $2
+      AND e.estado = 0
+  `;
+  
+  const result = await query(sql, [fecha, empleadoId]);
+  return result.rows[0];
+};
+
+// Obtener totales por rango y empleado
+const getTotalesPorRangoYEmpleado = async (fechaInicio, fechaFin, empleadoId) => {
+  const sql = `
+    SELECT 
+      COALESCE(SUM(total), 0) as total_general,
+      COALESCE(SUM(CASE WHEN forma_pago = 'Efectivo' THEN total ELSE 0 END), 0) as total_efectivo,
+      COALESCE(SUM(CASE WHEN forma_pago = 'Qr' THEN total ELSE 0 END), 0) as total_qr,
+      (
+        SELECT COALESCE(SUM(total), 0) 
+        FROM ventas v2 
+        INNER JOIN empleados e2 ON v2.empleado_id = e2.idempleado
+        WHERE DATE(v2.fecha_hora) = CURRENT_DATE 
+          AND v2.empleado_id = $3
+          AND e2.estado = 0
+      ) as total_general_hoy
+    FROM ventas v
+    INNER JOIN empleados e ON v.empleado_id = e.idempleado
+    WHERE DATE(v.fecha_hora) BETWEEN $1 AND $2
+      AND v.empleado_id = $3
+      AND e.estado = 0
+  `;
+  
+  const result = await query(sql, [fechaInicio, fechaFin, empleadoId]);
+  return result.rows[0];
+};
+
 module.exports = {
   getAllVentas,
   getVentasPorFecha,
@@ -299,5 +369,8 @@ module.exports = {
   getTotalesGenerales,
   getTotalesPorFecha,
   getTotalesPorRango,
-  getTotalesHoy
+  getTotalesHoy,
+  getTotalesHoyPorEmpleado,
+  getTotalesPorFechaYEmpleado,
+  getTotalesPorRangoYEmpleado
 };

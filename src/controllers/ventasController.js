@@ -63,29 +63,46 @@ const getVentasHoyEmpleado = async (req, res) => {
 
 const getTotalesVentas = async (req, res) => {
   try {
-    const { fecha, fechaInicio, fechaFin } = req.query;
+    const { fecha, fechaInicio, fechaFin, empleadoId } = req.query;
     
     let totales;
     let totalesHoy;
     
-    // Obtener totales según filtro
-    if (fecha) {
-      totales = await ventasService.getTotalesPorFecha(fecha);
-    } else if (fechaInicio && fechaFin) {
-      totales = await ventasService.getTotalesPorRango(fechaInicio, fechaFin);
+    if (empleadoId) {
+      // Para empleados: obtener totales específicos del empleado
+      if (fecha) {
+        totales = await ventasService.getTotalesPorFechaYEmpleado(fecha, parseInt(empleadoId));
+      } else if (fechaInicio && fechaFin) {
+        totales = await ventasService.getTotalesPorRangoYEmpleado(fechaInicio, fechaFin, parseInt(empleadoId));
+      } else {
+        totalesHoy = await ventasService.getTotalesHoyPorEmpleado(parseInt(empleadoId));
+        totales = {
+          total_general: totalesHoy.total_general_hoy,
+          total_efectivo: totalesHoy.total_efectivo_hoy,
+          total_qr: totalesHoy.total_qr_hoy,
+          total_general_hoy: totalesHoy.total_general_hoy
+        };
+      }
     } else {
-      totales = await ventasService.getTotalesGenerales();
+      // Para admin: obtener totales generales
+      if (fecha) {
+        totales = await ventasService.getTotalesPorFecha(fecha);
+      } else if (fechaInicio && fechaFin) {
+        totales = await ventasService.getTotalesPorRango(fechaInicio, fechaFin);
+      } else {
+        totales = await ventasService.getTotalesGenerales();
+      }
+      
+      // Siempre obtener los totales del día actual para admin
+      totalesHoy = await ventasService.getTotalesHoy();
     }
-    
-    // Siempre obtener los totales del día actual
-    totalesHoy = await ventasService.getTotalesHoy();
     
     // Combinar los resultados
     const resultado = {
       totalGeneral: parseFloat(totales.total_general) || 0,
       totalEfectivo: parseFloat(totales.total_efectivo) || 0,
       totalQR: parseFloat(totales.total_qr) || 0,
-      totalGeneralHoy: parseFloat(totalesHoy.total_general_hoy) || 0
+      totalGeneralHoy: parseFloat(totales.total_general_hoy) || 0
     };
     
     res.json(resultado);
