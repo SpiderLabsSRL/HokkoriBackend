@@ -40,6 +40,17 @@ const getSaldoCaja = async (empleadoId) => {
     );
 
     if (cajaResult.rows.length === 0) {
+      // Si no hay caja abierta, retornar el último monto_cierre o 0
+      const ultimaCajaResult = await query(
+        `SELECT monto_cierre FROM caja 
+         WHERE empleado_id = $1 AND estado = 'Cerrado' 
+         ORDER BY idcaja DESC LIMIT 1`,
+        [empleadoId]
+      );
+      
+      if (ultimaCajaResult.rows.length > 0 && ultimaCajaResult.rows[0].monto_cierre) {
+        return parseFloat(ultimaCajaResult.rows[0].monto_cierre);
+      }
       return 0;
     }
 
@@ -65,26 +76,50 @@ const getSaldoCaja = async (empleadoId) => {
   }
 };
 
-const getHistorialDelDia = async (empleadoId) => {
+const getHistorialDelDia = async (empleadoId, esAdministrador = false) => {
   try {
-    const result = await query(
-      `SELECT 
-         mc.idmovimiento,
-         mc.fecha_hora,
-         mc.tipo,
-         mc.descripcion,
-         mc.monto,
-         mc.empleado_id,
-         mc.caja_id,
-         e.nombres || ' ' || e.apellidos as usuario
-       FROM movimiento_caja mc
-       INNER JOIN empleados e ON mc.empleado_id = e.idempleado
-       WHERE mc.empleado_id = $1 
-         AND DATE(mc.fecha_hora) = CURRENT_DATE
-       ORDER BY mc.fecha_hora DESC`,
-      [empleadoId]
-    );
+    let queryText, queryParams;
 
+    if (esAdministrador) {
+      // Administrador ve todos los movimientos del día
+      queryText = `
+        SELECT 
+          mc.idmovimiento,
+          mc.fecha_hora,
+          mc.tipo,
+          mc.descripcion,
+          mc.monto,
+          mc.empleado_id,
+          mc.caja_id,
+          e.nombres || ' ' || e.apellidos as usuario
+        FROM movimiento_caja mc
+        INNER JOIN empleados e ON mc.empleado_id = e.idempleado
+        WHERE DATE(mc.fecha_hora) = CURRENT_DATE
+        ORDER BY mc.fecha_hora DESC
+      `;
+      queryParams = [];
+    } else {
+      // Empleado solo ve sus movimientos del día
+      queryText = `
+        SELECT 
+          mc.idmovimiento,
+          mc.fecha_hora,
+          mc.tipo,
+          mc.descripcion,
+          mc.monto,
+          mc.empleado_id,
+          mc.caja_id,
+          e.nombres || ' ' || e.apellidos as usuario
+        FROM movimiento_caja mc
+        INNER JOIN empleados e ON mc.empleado_id = e.idempleado
+        WHERE mc.empleado_id = $1 
+          AND DATE(mc.fecha_hora) = CURRENT_DATE
+        ORDER BY mc.fecha_hora DESC
+      `;
+      queryParams = [empleadoId];
+    }
+
+    const result = await query(queryText, queryParams);
     return result.rows;
   } catch (error) {
     console.error("Error en getHistorialDelDia:", error);
@@ -98,53 +133,24 @@ const registrarMovimiento = async (tipo, monto, descripcion, empleadoId) => {
   try {
     await client.query('BEGIN');
 
-    let cajaId;
-    let movimiento;
+    // Verificar que haya caja abierta
+    const cajaResult = await client.query(
+      `SELECT idcaja 
+       FROM caja 
+       WHERE empleado_id = $1 AND estado = 'Abierto' 
+       ORDER BY idcaja DESC 
+       LIMIT 1`,
+      [empleadoId]
+    );
 
-    if (tipo.toLowerCase() === 'ingreso') {
-      // Verificar que haya caja abierta
-      const cajaResult = await client.query(
-        `SELECT idcaja 
-         FROM caja 
-         WHERE empleado_id = $1 AND estado = 'Abierto' 
-         ORDER BY idcaja DESC 
-         LIMIT 1`,
-        [empleadoId]
-      );
+    if (cajaResult.rows.length === 0) {
+      throw new Error("No hay caja abierta. Debe abrir caja primero.");
+    }
 
-      if (cajaResult.rows.length === 0) {
-        throw new Error("No hay caja abierta. Debe abrir caja primero.");
-      }
+    const cajaId = cajaResult.rows[0].idcaja;
 
-      cajaId = cajaResult.rows[0].idcaja;
-
-      // Registrar movimiento de ingreso
-      const movimientoResult = await client.query(
-        `INSERT INTO movimiento_caja (caja_id, tipo, descripcion, monto, empleado_id) 
-         VALUES ($1, 'Ingreso', $2, $3, $4) 
-         RETURNING *`,
-        [cajaId, descripcion, monto, empleadoId]
-      );
-      movimiento = movimientoResult.rows[0];
-
-    } else if (tipo.toLowerCase() === 'egreso') {
-      // Verificar que haya caja abierta
-      const cajaResult = await client.query(
-        `SELECT idcaja 
-         FROM caja 
-         WHERE empleado_id = $1 AND estado = 'Abierto' 
-         ORDER BY idcaja DESC 
-         LIMIT 1`,
-        [empleadoId]
-      );
-
-      if (cajaResult.rows.length === 0) {
-        throw new Error("No hay caja abierta. Debe abrir caja primero.");
-      }
-
-      cajaId = cajaResult.rows[0].idcaja;
-
-      // Obtener monto apertura y movimientos para calcular saldo actual
+    // Para egresos, verificar saldo suficiente
+    if (tipo.toLowerCase() === 'egreso') {
       const cajaInfo = await client.query(
         `SELECT monto_apertura FROM caja WHERE idcaja = $1`,
         [cajaId]
@@ -167,16 +173,16 @@ const registrarMovimiento = async (tipo, monto, descripcion, empleadoId) => {
       if (monto > saldoDisponible) {
         throw new Error(`Saldo insuficiente. Saldo actual: Bs. ${saldoDisponible.toFixed(2)}`);
       }
-
-      // Registrar movimiento de egreso
-      const movimientoResult = await client.query(
-        `INSERT INTO movimiento_caja (caja_id, tipo, descripcion, monto, empleado_id) 
-         VALUES ($1, 'Egreso', $2, $3, $4) 
-         RETURNING *`,
-        [cajaId, descripcion, monto, empleadoId]
-      );
-      movimiento = movimientoResult.rows[0];
     }
+
+    // Registrar movimiento
+    const movimientoResult = await client.query(
+      `INSERT INTO movimiento_caja (caja_id, tipo, descripcion, monto, empleado_id) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING *`,
+      [cajaId, tipo, descripcion, monto, empleadoId]
+    );
+    const movimiento = movimientoResult.rows[0];
 
     await client.query('COMMIT');
     return movimiento;
@@ -206,8 +212,8 @@ const abrirCaja = async (monto, descripcion, empleadoId) => {
       throw new Error("Ya existe una caja abierta para este empleado");
     }
 
-    // Obtener el saldo actual de la última caja cerrada (si existe)
-    let saldoActual = monto;
+    // Obtener el monto_cierre de la última caja cerrada (si existe)
+    let montoApertura = monto;
     
     const ultimaCajaResult = await client.query(
       `SELECT monto_cierre FROM caja 
@@ -217,15 +223,15 @@ const abrirCaja = async (monto, descripcion, empleadoId) => {
     );
 
     if (ultimaCajaResult.rows.length > 0 && ultimaCajaResult.rows[0].monto_cierre) {
-      saldoActual = parseFloat(ultimaCajaResult.rows[0].monto_cierre);
+      montoApertura = parseFloat(ultimaCajaResult.rows[0].monto_cierre);
     }
 
-    // Crear nueva caja
+    // Crear NUEVA caja
     const cajaResult = await client.query(
       `INSERT INTO caja (estado, monto_apertura, empleado_id) 
        VALUES ('Abierto', $1, $2) 
        RETURNING idcaja`,
-      [saldoActual, empleadoId]
+      [montoApertura, empleadoId]
     );
     const cajaId = cajaResult.rows[0].idcaja;
 
@@ -234,7 +240,7 @@ const abrirCaja = async (monto, descripcion, empleadoId) => {
       `INSERT INTO movimiento_caja (caja_id, tipo, descripcion, monto, empleado_id) 
        VALUES ($1, 'Apertura', $2, $3, $4) 
        RETURNING *`,
-      [cajaId, descripcion, saldoActual, empleadoId]
+      [cajaId, descripcion, montoApertura, empleadoId]
     );
     const movimiento = movimientoResult.rows[0];
 
@@ -321,6 +327,25 @@ const cerrarCaja = async (monto, descripcion, empleadoId) => {
   }
 };
 
+// Función para verificar si el usuario es administrador
+const esAdministrador = async (empleadoId) => {
+  try {
+    const result = await query(
+      `SELECT rol FROM empleados WHERE idempleado = $1`,
+      [empleadoId]
+    );
+    
+    if (result.rows.length === 0) {
+      return false;
+    }
+    
+    return result.rows[0].rol === 'Administrador';
+  } catch (error) {
+    console.error("Error en esAdministrador:", error);
+    return false;
+  }
+};
+
 module.exports = {
   getEstadoCaja,
   getSaldoCaja,
@@ -328,4 +353,5 @@ module.exports = {
   registrarMovimiento,
   abrirCaja,
   cerrarCaja,
+  esAdministrador
 };

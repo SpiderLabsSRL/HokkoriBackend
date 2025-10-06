@@ -1,8 +1,15 @@
 const movimientosService = require("../services/movimientosService");
 
+// Middleware para obtener el empleadoId (debes adaptar esto según tu sistema de autenticación)
+const getEmpleadoId = (req) => {
+  // Aquí debes obtener el empleadoId del token de sesión
+  // Por ahora lo dejamos como 1 para pruebas, pero debes implementar tu lógica de autenticación
+  return req.user?.empleadoId || 1;
+};
+
 const getEstadoCaja = async (req, res) => {
   try {
-    const empleadoId = 1; // Cambiar esto según tu lógica de sesión
+    const empleadoId = getEmpleadoId(req);
     const caja = await movimientosService.getEstadoCaja(empleadoId);
     res.json(caja);
   } catch (error) {
@@ -13,7 +20,7 @@ const getEstadoCaja = async (req, res) => {
 
 const getSaldoCaja = async (req, res) => {
   try {
-    const empleadoId = 1; // Cambiar esto según tu lógica de sesión
+    const empleadoId = getEmpleadoId(req);
     const saldo = await movimientosService.getSaldoCaja(empleadoId);
     res.json({ saldo: saldo.toString() });
   } catch (error) {
@@ -24,8 +31,10 @@ const getSaldoCaja = async (req, res) => {
 
 const getHistorialDelDia = async (req, res) => {
   try {
-    const empleadoId = 1; // Cambiar esto según tu lógica de sesión
-    const historial = await movimientosService.getHistorialDelDia(empleadoId);
+    const empleadoId = getEmpleadoId(req);
+    const esAdministrador = await movimientosService.esAdministrador(empleadoId);
+    
+    const historial = await movimientosService.getHistorialDelDia(empleadoId, esAdministrador);
     res.json(historial);
   } catch (error) {
     console.error("Error en getHistorialDelDia:", error);
@@ -36,7 +45,7 @@ const getHistorialDelDia = async (req, res) => {
 const registrarMovimiento = async (req, res) => {
   try {
     const { tipo, monto, descripcion } = req.body;
-    const empleadoId = 1; // Cambiar esto según tu lógica de sesión
+    const empleadoId = getEmpleadoId(req);
 
     if (!tipo || !monto || !descripcion) {
       return res.status(400).json({ error: "Todos los campos son requeridos" });
@@ -46,8 +55,14 @@ const registrarMovimiento = async (req, res) => {
       return res.status(400).json({ error: "El monto debe ser mayor a 0" });
     }
 
+    // Validar tipos permitidos
+    const tiposPermitidos = ['ingreso', 'egreso'];
+    if (!tiposPermitidos.includes(tipo.toLowerCase())) {
+      return res.status(400).json({ error: "Tipo de movimiento no válido" });
+    }
+
     const movimiento = await movimientosService.registrarMovimiento(
-      tipo,
+      tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase(),
       parseFloat(monto),
       descripcion,
       empleadoId
@@ -63,7 +78,7 @@ const registrarMovimiento = async (req, res) => {
 const aperturaCaja = async (req, res) => {
   try {
     const { monto, descripcion } = req.body;
-    const empleadoId = 1; // Cambiar esto según tu lógica de sesión
+    const empleadoId = getEmpleadoId(req);
 
     if (!monto || !descripcion) {
       return res.status(400).json({ error: "Todos los campos son requeridos" });
@@ -89,7 +104,7 @@ const aperturaCaja = async (req, res) => {
 const cierreCaja = async (req, res) => {
   try {
     const { monto, descripcion } = req.body;
-    const empleadoId = 1; // Cambiar esto según tu lógica de sesión
+    const empleadoId = getEmpleadoId(req);
 
     if (!monto || !descripcion) {
       return res.status(400).json({ error: "Todos los campos son requeridos" });
