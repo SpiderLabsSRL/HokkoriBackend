@@ -1,0 +1,22 @@
+name: Keep-alive Render (Bolivia Time)
+on:
+  schedule:
+    # De 06:00 a 23:00 (10-23 UTC) todos los días (domingo=0 a sábado=6)
+    - cron: '*/13 10-23 * * 0-6'
+    # De 00:00 a 03:59 UTC (20:00 a 23:59 Bolivia Time) — por separado para cada día
+    - cron: '*/13 0-3 * * 1'
+    - cron: '*/13 0-3 * * 2'
+    - cron: '*/13 0-3 * * 3'
+    - cron: '*/13 0-3 * * 4'
+    - cron: '*/13 0-3 * * 5'
+    - cron: '*/13 0-3 * * 6'
+    - cron: '*/13 0-3 * * 0'
+  workflow_dispatch:
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hacer ping al backend
+        run: |
+          curl -s -o /dev/null -w "Status: %{http_code}\n" https://hokkoribackend.onrender.com/api/coupons/coupons
