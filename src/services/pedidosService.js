@@ -5,6 +5,7 @@ const getPedidos = async () => {
     `SELECT p.* 
      FROM pedidos p 
      WHERE p.estado != 3 
+     AND DATE(p.fecha_hora AT TIME ZONE 'America/La_Paz') = CURRENT_DATE
      ORDER BY p.fecha_hora DESC`
   );
   return result.rows;
@@ -308,7 +309,6 @@ const getCajaEstado = async () => {
   return result.rows[0];
 };
 
-// Funciones para productos
 // Funciones para productos
 const searchProductos = async (searchTerm) => {
   if (!searchTerm || searchTerm.trim() === '') {
