@@ -24,5 +24,9 @@ router.get("/cupones/:id", pedidosController.getCuponById);
 
 // Nueva ruta para estado de caja
 router.get("/caja/estado", pedidosController.getCajaEstado);
+// Rutas para productos (agregar al final)
+router.get("/productos", pedidosController.searchProductos);
+router.get("/productos/all", pedidosController.getProductos);
+router.get("/productos/:id", pedidosController.getProductoById);
 
 module.exports = router;
