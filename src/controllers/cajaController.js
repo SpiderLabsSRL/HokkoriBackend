@@ -16,9 +16,14 @@ const getCajaActual = async (req, res) => {
 const getMovimientosCaja = async (req, res) => {
   try {
     const { fechaInicio, fechaFin, tipo } = req.query;
+    
+    // Convertir fechas a objetos Date si están presentes
+    const fechaInicioDate = fechaInicio ? new Date(fechaInicio) : undefined;
+    const fechaFinDate = fechaFin ? new Date(fechaFin) : undefined;
+    
     const movimientos = await cajaService.getMovimientosCaja({
-      fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
-      fechaFin: fechaFin ? new Date(fechaFin) : undefined,
+      fechaInicio: fechaInicioDate,
+      fechaFin: fechaFinDate,
       tipo
     });
     res.json(movimientos);
@@ -41,9 +46,14 @@ const getTotalEnCaja = async (req, res) => {
 const getTotalesPorTipo = async (req, res) => {
   try {
     const { fechaInicio, fechaFin } = req.query;
+    
+    // Convertir fechas a objetos Date si están presentes
+    const fechaInicioDate = fechaInicio ? new Date(fechaInicio) : undefined;
+    const fechaFinDate = fechaFin ? new Date(fechaFin) : undefined;
+    
     const totales = await cajaService.getTotalesPorTipo({
-      fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
-      fechaFin: fechaFin ? new Date(fechaFin) : undefined
+      fechaInicio: fechaInicioDate,
+      fechaFin: fechaFinDate
     });
     res.json({
       ingresos: totales.ingresos.toString(),

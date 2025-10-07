@@ -31,16 +31,21 @@ const getMovimientosCaja = async (filtros = {}) => {
   const params = [];
   let paramCount = 0;
 
-  if (filtros.fechaInicio) {
-    paramCount++;
-    sql += ` AND mc.fecha_hora >= $${paramCount}`;
-    params.push(filtros.fechaInicio);
-  }
+  // Si no hay filtros de fecha, mostrar solo movimientos del día actual en Bolivia
+  if (!filtros.fechaInicio && !filtros.fechaFin) {
+    sql += ` AND DATE(mc.fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE 'America/La_Paz') = CURRENT_DATE`;
+  } else {
+    if (filtros.fechaInicio) {
+      paramCount++;
+      sql += ` AND mc.fecha_hora >= $${paramCount}`;
+      params.push(filtros.fechaInicio);
+    }
 
-  if (filtros.fechaFin) {
-    paramCount++;
-    sql += ` AND mc.fecha_hora <= $${paramCount}`;
-    params.push(filtros.fechaFin);
+    if (filtros.fechaFin) {
+      paramCount++;
+      sql += ` AND mc.fecha_hora <= $${paramCount}`;
+      params.push(filtros.fechaFin);
+    }
   }
 
   if (filtros.tipo) {
@@ -56,7 +61,6 @@ const getMovimientosCaja = async (filtros = {}) => {
 };
 
 const getTotalEnCaja = async () => {
-  // Obtener el último monto_cierre de la tabla caja (última caja cerrada)
   const result = await query(`
     SELECT monto_cierre 
     FROM caja 
@@ -69,13 +73,11 @@ const getTotalEnCaja = async () => {
     return parseFloat(result.rows[0].monto_cierre);
   }
   
-  // Si no hay cajas cerradas, buscar si hay una caja abierta
   const cajaAbierta = await getCajaActual();
   if (cajaAbierta) {
     return parseFloat(cajaAbierta.monto_apertura);
   }
   
-  // Si no hay cajas, retornar 0
   return 0;
 };
 
@@ -91,16 +93,21 @@ const getTotalesPorTipo = async (filtros = {}) => {
   const params = [];
   let paramCount = 0;
 
-  if (filtros.fechaInicio) {
-    paramCount++;
-    sql += ` AND fecha_hora >= $${paramCount}`;
-    params.push(filtros.fechaInicio);
-  }
+  // Si no hay filtros de fecha, mostrar solo totales del día actual en Bolivia
+  if (!filtros.fechaInicio && !filtros.fechaFin) {
+    sql += ` AND DATE(fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE 'America/La_Paz') = CURRENT_DATE`;
+  } else {
+    if (filtros.fechaInicio) {
+      paramCount++;
+      sql += ` AND fecha_hora >= $${paramCount}`;
+      params.push(filtros.fechaInicio);
+    }
 
-  if (filtros.fechaFin) {
-    paramCount++;
-    sql += ` AND fecha_hora <= $${paramCount}`;
-    params.push(filtros.fechaFin);
+    if (filtros.fechaFin) {
+      paramCount++;
+      sql += ` AND fecha_hora <= $${paramCount}`;
+      params.push(filtros.fechaFin);
+    }
   }
 
   const result = await query(sql, params);
