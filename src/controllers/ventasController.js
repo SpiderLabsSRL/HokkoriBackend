@@ -13,8 +13,8 @@ const getVentas = async (req, res) => {
       // Filtrar por rango de fechas
       ventas = await ventasService.getVentasPorRango(fechaInicio, fechaFin);
     } else {
-      // Obtener todas las ventas
-      ventas = await ventasService.getAllVentas();
+      // Por defecto: obtener ventas del día de hoy
+      ventas = await ventasService.getVentasHoy();
     }
     
     res.json(ventas);
@@ -90,11 +90,15 @@ const getTotalesVentas = async (req, res) => {
       } else if (fechaInicio && fechaFin) {
         totales = await ventasService.getTotalesPorRango(fechaInicio, fechaFin);
       } else {
-        totales = await ventasService.getTotalesGenerales();
+        // Por defecto: totales del día de hoy
+        totalesHoy = await ventasService.getTotalesHoy();
+        totales = {
+          total_general: totalesHoy.total_general_hoy,
+          total_efectivo: totalesHoy.total_efectivo_hoy,
+          total_qr: totalesHoy.total_qr_hoy,
+          total_general_hoy: totalesHoy.total_general_hoy
+        };
       }
-      
-      // Siempre obtener los totales del día actual para admin
-      totalesHoy = await ventasService.getTotalesHoy();
     }
     
     // Combinar los resultados
