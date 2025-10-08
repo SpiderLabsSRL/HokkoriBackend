@@ -1,14 +1,15 @@
 const { query, pool } = require("../../db");
 
-const getEstadoCaja = async (empleadoId) => {
+const getEstadoCaja = async () => {
   try {
+    // Buscar la última caja registrada (sin filtrar por empleado)
     const result = await query(
-      `SELECT c.* 
-       FROM caja c 
-       WHERE c.empleado_id = $1 
+      `SELECT c.*, 
+              e.nombres || ' ' || e.apellidos as empleado_nombre
+       FROM caja c
+       LEFT JOIN empleados e ON c.empleado_id = e.idempleado
        ORDER BY c.idcaja DESC 
-       LIMIT 1`,
-      [empleadoId]
+       LIMIT 1`
     );
 
     if (result.rows.length === 0) {
@@ -17,7 +18,8 @@ const getEstadoCaja = async (empleadoId) => {
         estado: "Cerrado",
         monto_apertura: "0.00",
         monto_cierre: null,
-        empleado_id: empleadoId
+        empleado_id: null,
+        empleado_nombre: null
       };
     }
 
@@ -28,34 +30,29 @@ const getEstadoCaja = async (empleadoId) => {
   }
 };
 
-const getSaldoCaja = async (empleadoId) => {
+const getSaldoCaja = async () => {
   try {
     const cajaResult = await query(
-      `SELECT idcaja, monto_apertura 
+      `SELECT idcaja, estado, monto_apertura, monto_cierre 
        FROM caja 
-       WHERE empleado_id = $1 AND estado = 'Abierto' 
        ORDER BY idcaja DESC 
-       LIMIT 1`,
-      [empleadoId]
+       LIMIT 1`
     );
 
     if (cajaResult.rows.length === 0) {
-      // Si no hay caja abierta, retornar el último monto_cierre o 0
-      const ultimaCajaResult = await query(
-        `SELECT monto_cierre FROM caja 
-         WHERE empleado_id = $1 AND estado = 'Cerrado' 
-         ORDER BY idcaja DESC LIMIT 1`,
-        [empleadoId]
-      );
-      
-      if (ultimaCajaResult.rows.length > 0 && ultimaCajaResult.rows[0].monto_cierre) {
-        return parseFloat(ultimaCajaResult.rows[0].monto_cierre);
-      }
       return 0;
     }
 
-    const cajaId = cajaResult.rows[0].idcaja;
-    const montoApertura = parseFloat(cajaResult.rows[0].monto_apertura);
+    const cajaActual = cajaResult.rows[0];
+
+    // Si la caja está cerrada, retornar el monto_cierre
+    if (cajaActual.estado === 'Cerrado') {
+      return parseFloat(cajaActual.monto_cierre) || 0;
+    }
+
+    // Si la caja está abierta, calcular el saldo actual
+    const cajaId = cajaActual.idcaja;
+    const montoApertura = parseFloat(cajaActual.monto_apertura);
 
     const movimientosResult = await query(
       `SELECT 
@@ -133,14 +130,13 @@ const registrarMovimiento = async (tipo, monto, descripcion, empleadoId) => {
   try {
     await client.query('BEGIN');
 
-    // Verificar que haya caja abierta
+    // Verificar que haya caja abierta (compartida para todos)
     const cajaResult = await client.query(
       `SELECT idcaja 
        FROM caja 
-       WHERE empleado_id = $1 AND estado = 'Abierto' 
+       WHERE estado = 'Abierto' 
        ORDER BY idcaja DESC 
-       LIMIT 1`,
-      [empleadoId]
+       LIMIT 1`
     );
 
     if (cajaResult.rows.length === 0) {
@@ -151,27 +147,10 @@ const registrarMovimiento = async (tipo, monto, descripcion, empleadoId) => {
 
     // Para egresos, verificar saldo suficiente
     if (tipo.toLowerCase() === 'egreso') {
-      const cajaInfo = await client.query(
-        `SELECT monto_apertura FROM caja WHERE idcaja = $1`,
-        [cajaId]
-      );
-      const montoAperturaActual = parseFloat(cajaInfo.rows[0].monto_apertura);
-
-      const movimientosActuales = await client.query(
-        `SELECT 
-           COALESCE(SUM(CASE WHEN tipo = 'Ingreso' THEN monto ELSE 0 END), 0) as total_ingresos,
-           COALESCE(SUM(CASE WHEN tipo = 'Egreso' THEN monto ELSE 0 END), 0) as total_egresos
-         FROM movimiento_caja 
-         WHERE caja_id = $1 AND tipo IN ('Ingreso', 'Egreso')`,
-        [cajaId]
-      );
-
-      const ingresosActuales = parseFloat(movimientosActuales.rows[0].total_ingresos) || 0;
-      const egresosActuales = parseFloat(movimientosActuales.rows[0].total_egresos) || 0;
-      const saldoDisponible = montoAperturaActual + ingresosActuales - egresosActuales;
-
-      if (monto > saldoDisponible) {
-        throw new Error(`Saldo insuficiente. Saldo actual: Bs. ${saldoDisponible.toFixed(2)}`);
+      const saldoActual = await getSaldoCaja();
+      
+      if (monto > saldoActual) {
+        throw new Error(`Saldo insuficiente. Saldo actual: Bs. ${saldoActual.toFixed(2)}`);
       }
     }
 
@@ -202,31 +181,30 @@ const abrirCaja = async (monto, descripcion, empleadoId) => {
   try {
     await client.query('BEGIN');
 
-    // Verificar si ya hay una caja ABIERTA para este empleado
+    // Verificar si ya hay una caja ABIERTA (compartida para todos)
     const cajaAbiertaResult = await client.query(
-      `SELECT idcaja FROM caja WHERE empleado_id = $1 AND estado = 'Abierto'`,
-      [empleadoId]
+      `SELECT idcaja FROM caja WHERE estado = 'Abierto'`
     );
 
     if (cajaAbiertaResult.rows.length > 0) {
-      throw new Error("Ya existe una caja abierta para este empleado");
+      throw new Error("Ya existe una caja abierta");
     }
 
-    // Obtener el monto_cierre de la última caja cerrada (si existe)
-    let montoApertura = monto;
-    
+    // Obtener el último monto_cierre registrado
     const ultimaCajaResult = await client.query(
       `SELECT monto_cierre FROM caja 
-       WHERE empleado_id = $1 AND estado = 'Cerrado' 
-       ORDER BY idcaja DESC LIMIT 1`,
-      [empleadoId]
+       WHERE estado = 'Cerrado' 
+       ORDER BY idcaja DESC LIMIT 1`
     );
 
+    let montoApertura = monto;
+    
+    // Si hay un monto_cierre anterior, usarlo como monto_apertura
     if (ultimaCajaResult.rows.length > 0 && ultimaCajaResult.rows[0].monto_cierre) {
       montoApertura = parseFloat(ultimaCajaResult.rows[0].monto_cierre);
     }
 
-    // Crear NUEVA caja
+    // Crear NUEVA caja compartida con el monto_apertura (último monto_cierre)
     const cajaResult = await client.query(
       `INSERT INTO caja (estado, monto_apertura, empleado_id) 
        VALUES ('Abierto', $1, $2) 
@@ -235,12 +213,12 @@ const abrirCaja = async (monto, descripcion, empleadoId) => {
     );
     const cajaId = cajaResult.rows[0].idcaja;
 
-    // Registrar movimiento de apertura
+    // Registrar movimiento de apertura con el monto ingresado por el usuario
     const movimientoResult = await client.query(
       `INSERT INTO movimiento_caja (caja_id, tipo, descripcion, monto, empleado_id) 
        VALUES ($1, 'Apertura', $2, $3, $4) 
        RETURNING *`,
-      [cajaId, descripcion, montoApertura, empleadoId]
+      [cajaId, descripcion, monto, empleadoId]
     );
     const movimiento = movimientoResult.rows[0];
 
@@ -262,14 +240,13 @@ const cerrarCaja = async (monto, descripcion, empleadoId) => {
   try {
     await client.query('BEGIN');
 
-    // Obtener caja activa
+    // Obtener caja activa (compartida)
     const cajaResult = await client.query(
       `SELECT idcaja, monto_apertura 
        FROM caja 
-       WHERE empleado_id = $1 AND estado = 'Abierto' 
+       WHERE estado = 'Abierto' 
        ORDER BY idcaja DESC 
-       LIMIT 1`,
-      [empleadoId]
+       LIMIT 1`
     );
 
     if (cajaResult.rows.length === 0) {
@@ -294,11 +271,11 @@ const cerrarCaja = async (monto, descripcion, empleadoId) => {
     const saldoActual = montoApertura + totalIngresos - totalEgresos;
 
     // Verificar que el monto de cierre coincida
-    if (parseFloat(monto) !== saldoActual) {
+    if (Math.abs(parseFloat(monto) - saldoActual) > 0.01) { // Tolerancia de 0.01 por redondeo
       throw new Error(`El monto de cierre (Bs. ${monto}) no coincide con el saldo actual (Bs. ${saldoActual.toFixed(2)})`);
     }
 
-    // Actualizar caja a estado Cerrado
+    // Actualizar caja a estado Cerrado con el monto_cierre
     await client.query(
       `UPDATE caja 
        SET estado = 'Cerrado', monto_cierre = $1 
@@ -324,6 +301,26 @@ const cerrarCaja = async (monto, descripcion, empleadoId) => {
     throw new Error(error.message || "Error al cerrar la caja");
   } finally {
     client.release();
+  }
+};
+
+const getMontoAperturaSugerido = async () => {
+  try {
+    // Obtener el último monto_cierre registrado
+    const result = await query(
+      `SELECT monto_cierre FROM caja 
+       WHERE estado = 'Cerrado' 
+       ORDER BY idcaja DESC LIMIT 1`
+    );
+
+    if (result.rows.length > 0 && result.rows[0].monto_cierre) {
+      return parseFloat(result.rows[0].monto_cierre);
+    }
+
+    return 0;
+  } catch (error) {
+    console.error("Error en getMontoAperturaSugerido:", error);
+    return 0;
   }
 };
 
@@ -353,5 +350,6 @@ module.exports = {
   registrarMovimiento,
   abrirCaja,
   cerrarCaja,
-  esAdministrador
+  esAdministrador,
+  getMontoAperturaSugerido
 };

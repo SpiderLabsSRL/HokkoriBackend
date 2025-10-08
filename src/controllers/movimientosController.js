@@ -1,16 +1,17 @@
 const movimientosService = require("../services/movimientosService");
 
-// Middleware para obtener el empleadoId (debes adaptar esto según tu sistema de autenticación)
+// Middleware para obtener el empleadoId del body de la petición
 const getEmpleadoId = (req) => {
-  // Aquí debes obtener el empleadoId del token de sesión
-  // Por ahora lo dejamos como 1 para pruebas, pero debes implementar tu lógica de autenticación
-  return req.user?.empleadoId || 1;
+  return req.body.empleadoId || req.query.empleadoId;
 };
 
 const getEstadoCaja = async (req, res) => {
   try {
     const empleadoId = getEmpleadoId(req);
-    const caja = await movimientosService.getEstadoCaja(empleadoId);
+    if (!empleadoId) {
+      return res.status(400).json({ error: "EmpleadoId es requerido" });
+    }
+    const caja = await movimientosService.getEstadoCaja();
     res.json(caja);
   } catch (error) {
     console.error("Error en getEstadoCaja:", error);
@@ -21,7 +22,10 @@ const getEstadoCaja = async (req, res) => {
 const getSaldoCaja = async (req, res) => {
   try {
     const empleadoId = getEmpleadoId(req);
-    const saldo = await movimientosService.getSaldoCaja(empleadoId);
+    if (!empleadoId) {
+      return res.status(400).json({ error: "EmpleadoId es requerido" });
+    }
+    const saldo = await movimientosService.getSaldoCaja();
     res.json({ saldo: saldo.toString() });
   } catch (error) {
     console.error("Error en getSaldoCaja:", error);
@@ -32,6 +36,11 @@ const getSaldoCaja = async (req, res) => {
 const getHistorialDelDia = async (req, res) => {
   try {
     const empleadoId = getEmpleadoId(req);
+    if (!empleadoId) {
+      return res.status(400).json({ error: "EmpleadoId es requerido" });
+    }
+    
+    // Verificar si el usuario es administrador
     const esAdministrador = await movimientosService.esAdministrador(empleadoId);
     
     const historial = await movimientosService.getHistorialDelDia(empleadoId, esAdministrador);
@@ -44,10 +53,9 @@ const getHistorialDelDia = async (req, res) => {
 
 const registrarMovimiento = async (req, res) => {
   try {
-    const { tipo, monto, descripcion } = req.body;
-    const empleadoId = getEmpleadoId(req);
+    const { tipo, monto, descripcion, empleadoId } = req.body;
 
-    if (!tipo || !monto || !descripcion) {
+    if (!tipo || !monto || !descripcion || !empleadoId) {
       return res.status(400).json({ error: "Todos los campos son requeridos" });
     }
 
@@ -77,10 +85,9 @@ const registrarMovimiento = async (req, res) => {
 
 const aperturaCaja = async (req, res) => {
   try {
-    const { monto, descripcion } = req.body;
-    const empleadoId = getEmpleadoId(req);
+    const { monto, descripcion, empleadoId } = req.body;
 
-    if (!monto || !descripcion) {
+    if (!monto || !descripcion || !empleadoId) {
       return res.status(400).json({ error: "Todos los campos son requeridos" });
     }
 
@@ -103,10 +110,9 @@ const aperturaCaja = async (req, res) => {
 
 const cierreCaja = async (req, res) => {
   try {
-    const { monto, descripcion } = req.body;
-    const empleadoId = getEmpleadoId(req);
+    const { monto, descripcion, empleadoId } = req.body;
 
-    if (!monto || !descripcion) {
+    if (!monto || !descripcion || !empleadoId) {
       return res.status(400).json({ error: "Todos los campos son requeridos" });
     }
 
@@ -127,6 +133,20 @@ const cierreCaja = async (req, res) => {
   }
 };
 
+const getMontoAperturaSugerido = async (req, res) => {
+  try {
+    const empleadoId = getEmpleadoId(req);
+    if (!empleadoId) {
+      return res.status(400).json({ error: "EmpleadoId es requerido" });
+    }
+    const montoSugerido = await movimientosService.getMontoAperturaSugerido();
+    res.json({ montoSugerido });
+  } catch (error) {
+    console.error("Error en getMontoAperturaSugerido:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getEstadoCaja,
   getSaldoCaja,
@@ -134,4 +154,5 @@ module.exports = {
   registrarMovimiento,
   aperturaCaja,
   cierreCaja,
+  getMontoAperturaSugerido
 };
